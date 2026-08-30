@@ -16,7 +16,7 @@ from werkzeug.security import (
 )
 
 from database import db
-from models import User
+from models import User, Order
 
 
 app = Flask(__name__)
@@ -47,7 +47,6 @@ app.config['JWT_SECRET_KEY'] = os.environ.get(
 # ============================================================
 
 db.init_app(app)
-
 jwt = JWTManager(app)
 
 
@@ -60,7 +59,7 @@ with app.app_context():
 
 
 # ============================================================
-# PRUEBA DE API
+# HEALTH
 # ============================================================
 
 @app.route('/api/health', methods=['GET'])
@@ -72,7 +71,7 @@ def health():
 
 
 # ============================================================
-# REGISTRO DE USUARIO
+# REGISTRO
 # ============================================================
 
 @app.route('/api/register', methods=['POST'])
@@ -158,18 +157,15 @@ def login():
             'message': 'Correo o contraseña incorrectos'
         }), 401
 
-    password_correcta = check_password_hash(
+    if not check_password_hash(
         usuario.password,
         password
-    )
-
-    if not password_correcta:
+    ):
         return jsonify({
             'status': 'error',
             'message': 'Correo o contraseña incorrectos'
         }), 401
 
-    # El token identifica al usuario por su ID.
     access_token = create_access_token(
         identity=str(usuario.id)
     )
@@ -189,11 +185,11 @@ def login():
 @app.route('/api/me', methods=['GET'])
 @jwt_required()
 def me():
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())
 
     usuario = db.session.get(
         User,
-        int(user_id)
+        user_id
     )
 
     if not usuario:
@@ -205,6 +201,146 @@ def me():
     return jsonify({
         'status': 'ok',
         'user': usuario.to_dict()
+    }), 200
+
+
+# ============================================================
+# CREAR PEDIDO
+# ============================================================
+
+@app.route('/api/orders', methods=['POST'])
+@jwt_required()
+def create_order():
+    user_id = int(get_jwt_identity())
+    data = request.get_json()
+
+    if not data:
+        return jsonify({
+            'status': 'error',
+            'message': 'No se recibieron datos'
+        }), 400
+
+    required_fields = [
+        'restaurante',
+        'producto',
+        'direccion',
+        'metodo_pago',
+        'subtotal'
+    ]
+
+    for field in required_fields:
+        if data.get(field) in [None, '']:
+            return jsonify({
+                'status': 'error',
+                'message': f'El campo {field} es obligatorio'
+            }), 400
+
+    subtotal = int(data['subtotal'])
+    envio = int(data.get('envio', 1000))
+    tarifa_servicio = int(
+        data.get('tarifa_servicio', 590)
+    )
+
+    total = subtotal + envio + tarifa_servicio
+
+    nuevo_pedido = Order(
+        user_id=user_id,
+        numero_pedido='TEMP',
+        restaurante=data['restaurante'],
+        producto=data['producto'],
+        cantidad=int(
+            data.get('cantidad', 1)
+        ),
+        adicionales=data.get('adicionales'),
+        imagen=data.get('imagen'),
+        estado=data.get(
+            'estado',
+            'confirmado'
+        ),
+        direccion=data['direccion'],
+        metodo_pago=data['metodo_pago'],
+        subtotal=subtotal,
+        envio=envio,
+        tarifa_servicio=tarifa_servicio,
+        total=total
+    )
+
+    db.session.add(nuevo_pedido)
+    db.session.flush()
+
+    nuevo_pedido.numero_pedido = (
+        f'FP-{1500 + nuevo_pedido.id}'
+    )
+
+    db.session.commit()
+
+    return jsonify({
+        'status': 'ok',
+        'message': 'Pedido creado correctamente',
+        'order': nuevo_pedido.to_dict()
+    }), 201
+
+
+# ============================================================
+# LISTAR PEDIDOS DEL USUARIO
+# ============================================================
+
+@app.route('/api/orders', methods=['GET'])
+@jwt_required()
+def get_orders():
+    user_id = int(get_jwt_identity())
+
+    pedidos = Order.query.filter_by(
+        user_id=user_id
+    ).order_by(
+        Order.fecha.desc()
+    ).all()
+
+    pedidos_actuales = [
+        pedido.to_dict()
+        for pedido in pedidos
+        if pedido.estado != 'entregado'
+    ]
+
+    pedidos_anteriores = [
+        pedido.to_dict()
+        for pedido in pedidos
+        if pedido.estado == 'entregado'
+    ]
+
+    return jsonify({
+        'status': 'ok',
+        'current_orders': pedidos_actuales,
+        'previous_orders': pedidos_anteriores
+    }), 200
+
+
+# ============================================================
+# DETALLE DE UN PEDIDO
+# ============================================================
+
+@app.route(
+    '/api/orders/<int:order_id>',
+    methods=['GET']
+)
+@jwt_required()
+def get_order_detail(order_id):
+    user_id = int(get_jwt_identity())
+
+    pedido = Order.query.filter_by(
+        id=order_id,
+        user_id=user_id
+    ).first()
+
+    if not pedido:
+        return jsonify({
+            'status': 'error',
+            'message': 'Pedido no encontrado'
+        }), 404
+
+    return jsonify({
+        'status': 'ok',
+        'order': pedido.to_dict()
     }), 200
 
 

@@ -1,5 +1,15 @@
+import os
+
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+
+from flask_jwt_extended import (
+    JWTManager,
+    create_access_token,
+    get_jwt_identity,
+    jwt_required,
+)
+
 from werkzeug.security import (
     generate_password_hash,
     check_password_hash,
@@ -21,7 +31,24 @@ CORS(app)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///foodplease.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+
+# ============================================================
+# CONFIGURACIÓN JWT
+# ============================================================
+
+app.config['JWT_SECRET_KEY'] = os.environ.get(
+    'JWT_SECRET_KEY',
+    'foodplease-clave-desarrollo-2026'
+)
+
+
+# ============================================================
+# INICIALIZAR EXTENSIONES
+# ============================================================
+
 db.init_app(app)
+
+jwt = JWTManager(app)
 
 
 # ============================================================
@@ -142,9 +169,41 @@ def login():
             'message': 'Correo o contraseña incorrectos'
         }), 401
 
+    # El token identifica al usuario por su ID.
+    access_token = create_access_token(
+        identity=str(usuario.id)
+    )
+
     return jsonify({
         'status': 'ok',
         'message': 'Inicio de sesión correcto',
+        'access_token': access_token,
+        'user': usuario.to_dict()
+    }), 200
+
+
+# ============================================================
+# USUARIO AUTENTICADO
+# ============================================================
+
+@app.route('/api/me', methods=['GET'])
+@jwt_required()
+def me():
+    user_id = get_jwt_identity()
+
+    usuario = db.session.get(
+        User,
+        int(user_id)
+    )
+
+    if not usuario:
+        return jsonify({
+            'status': 'error',
+            'message': 'Usuario no encontrado'
+        }), 404
+
+    return jsonify({
+        'status': 'ok',
         'user': usuario.to_dict()
     }), 200
 

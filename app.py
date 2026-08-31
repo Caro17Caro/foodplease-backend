@@ -831,6 +831,27 @@ def get_restaurant_products(restaurant_id):
 
 
 # ============================================================
+# LISTAR TODOS LOS PRODUCTOS
+# ============================================================
+
+@app.route('/api/products', methods=['GET'])
+def get_products():
+    productos = Product.query.filter_by(
+        disponible=True
+    ).order_by(
+        Product.nombre.asc()
+    ).all()
+
+    return jsonify({
+        'status': 'ok',
+        'products': [
+            producto.to_dict()
+            for producto in productos
+        ]
+    }), 200
+
+
+# ============================================================
 # DETALLE DE PRODUCTO
 # ============================================================
 

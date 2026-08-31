@@ -3,20 +3,73 @@ from database import db
 from models import Restaurant, Product
 
 
+def upsert_restaurant(
+    nombre,
+    categoria,
+    direccion,
+    tiempo_entrega,
+    costo_envio,
+    calificacion,
+    imagen
+):
+    restaurante = Restaurant.query.filter_by(
+        nombre=nombre
+    ).first()
+
+    if not restaurante:
+        restaurante = Restaurant(
+            nombre=nombre
+        )
+        db.session.add(restaurante)
+
+    restaurante.categoria = categoria
+    restaurante.direccion = direccion
+    restaurante.tiempo_entrega = tiempo_entrega
+    restaurante.costo_envio = costo_envio
+    restaurante.calificacion = calificacion
+    restaurante.imagen = imagen
+
+    db.session.flush()
+
+    return restaurante
+
+
+def upsert_product(
+    restaurante,
+    nombre,
+    descripcion,
+    precio,
+    imagen,
+    disponible=True
+):
+    producto = Product.query.filter_by(
+        restaurant_id=restaurante.id,
+        nombre=nombre
+    ).first()
+
+    if not producto:
+        producto = Product(
+            restaurant_id=restaurante.id,
+            nombre=nombre
+        )
+        db.session.add(producto)
+
+    producto.descripcion = descripcion
+    producto.precio = precio
+    producto.imagen = imagen
+    producto.disponible = disponible
+
+    return producto
+
+
 def create_seed():
     with app.app_context():
 
-        # Evita duplicar los restaurantes si ejecutamos seed.py otra vez
-        if Restaurant.query.first():
-            print("Ya existen restaurantes en la base de datos.")
-            print("No se agregaron datos duplicados.")
-            return
-
         # ====================================================
-        # RESTAURANTE 1
+        # LA CASA DE LA HAMBURGUESA
         # ====================================================
 
-        hamburgueseria = Restaurant(
+        hamburgueseria = upsert_restaurant(
             nombre="La Casa de la Hamburguesa",
             categoria="Hamburguesas",
             direccion="Santiago, Chile",
@@ -26,35 +79,27 @@ def create_seed():
             imagen="barros_luco.jpeg"
         )
 
-        db.session.add(hamburgueseria)
-        db.session.flush()
+        upsert_product(
+            hamburgueseria,
+            nombre="Doble carne",
+            descripcion="Hamburguesa doble carne con ingredientes seleccionados",
+            precio=8400,
+            imagen="barros_luco.jpeg"
+        )
 
-        productos_hamburgueseria = [
-            Product(
-                restaurant_id=hamburgueseria.id,
-                nombre="Doble carne",
-                descripcion="Hamburguesa doble carne con ingredientes seleccionados",
-                precio=8400,
-                imagen="barros_luco.jpeg",
-                disponible=True
-            ),
-            Product(
-                restaurant_id=hamburgueseria.id,
-                nombre="Barros Luco",
-                descripcion="Carne y queso fundido",
-                precio=5400,
-                imagen="barros_luco.jpeg",
-                disponible=True
-            )
-        ]
-
-        db.session.add_all(productos_hamburgueseria)
+        upsert_product(
+            hamburgueseria,
+            nombre="Barros Luco",
+            descripcion="Carne y queso fundido",
+            precio=5400,
+            imagen="barros_luco.jpeg"
+        )
 
         # ====================================================
-        # RESTAURANTE 2
+        # PIZZERIA NAPOLI
         # ====================================================
 
-        napoli = Restaurant(
+        napoli = upsert_restaurant(
             nombre="Pizzería Napoli",
             categoria="Pizzas",
             direccion="Santiago, Chile",
@@ -64,51 +109,39 @@ def create_seed():
             imagen="pizza_napolitana_pesto.jpeg"
         )
 
-        db.session.add(napoli)
-        db.session.flush()
+        upsert_product(
+            napoli,
+            nombre="Pizza Burrata - Pesto",
+            descripcion="Pizza con burrata, pesto y tomates",
+            precio=9400,
+            imagen="pizza_napolitana_pesto.jpeg"
+        )
 
-        productos_napoli = [
-            Product(
-                restaurant_id=napoli.id,
-                nombre="Pizza Burrata - Pesto",
-                descripcion="Pizza con burrata, pesto y tomates",
-                precio=9400,
-                imagen="pizza_napolitana_pesto.jpeg",
-                disponible=True
-            ),
-            Product(
-                restaurant_id=napoli.id,
-                nombre="Pizza Burrata",
-                descripcion="Pizza artesanal con burrata",
-                precio=9900,
-                imagen="pizza_burrata.jpeg",
-                disponible=True
-            ),
-            Product(
-                restaurant_id=napoli.id,
-                nombre="Pizza Carbonara",
-                descripcion="Pizza artesanal estilo carbonara",
-                precio=9500,
-                imagen="pizza_carbonara.jpeg",
-                disponible=True
-            )
-        ]
+        upsert_product(
+            napoli,
+            nombre="Pizza Burrata",
+            descripcion="Pizza artesanal con burrata",
+            precio=9900,
+            imagen="pizza_burrata.jpeg"
+        )
 
-        db.session.add_all(productos_napoli)
-
-        # ====================================================
-        # GUARDAR
-        # ====================================================
+        upsert_product(
+            napoli,
+            nombre="Pizza Carbonara",
+            descripcion="Pizza artesanal estilo carbonara",
+            precio=9500,
+            imagen="pizza_carbonara.jpeg"
+        )
 
         db.session.commit()
 
-        print("Datos de prueba creados correctamente.")
-        print()
-        print("Restaurantes:")
-        print(f"- {hamburgueseria.nombre}")
-        print(f"- {napoli.nombre}")
-        print()
-        print("Productos creados: 5")
+        print("Seed actualizado correctamente.")
+        print(
+            f"Restaurantes: {Restaurant.query.count()}"
+        )
+        print(
+            f"Productos: {Product.query.count()}"
+        )
 
 
 if __name__ == "__main__":

@@ -16,8 +16,14 @@ from werkzeug.security import (
 )
 
 from database import db
-from models import User, Order, Restaurant, Product, Address
-
+from models import (
+    User,
+    Order,
+    Restaurant,
+    Product,
+    Address,
+    PaymentMethod
+)
 
 app = Flask(__name__)
 
@@ -563,6 +569,121 @@ def delete_address(address_id):
         'status': 'ok',
         'message': 'Direccion eliminada correctamente'
     }), 200
+
+
+# ============================================================
+# LISTAR METODOS DE PAGO
+# ============================================================
+
+@app.route('/api/payment-methods', methods=['GET'])
+@jwt_required()
+def get_payment_methods():
+    user_id = int(get_jwt_identity())
+
+    metodos = PaymentMethod.query.filter_by(
+        user_id=user_id
+    ).order_by(
+        PaymentMethod.es_principal.desc(),
+        PaymentMethod.id.asc()
+    ).all()
+
+    return jsonify({
+        'status': 'ok',
+        'payment_methods': [
+            metodo.to_dict()
+            for metodo in metodos
+        ]
+    }), 200
+
+
+# ============================================================
+# CREAR METODO DE PAGO
+# ============================================================
+
+@app.route('/api/payment-methods', methods=['POST'])
+@jwt_required()
+def create_payment_method():
+    user_id = int(get_jwt_identity())
+    data = request.get_json()
+
+    if not data:
+        return jsonify({
+            'status': 'error',
+            'message': 'No se recibieron datos'
+        }), 400
+
+    marca = data.get('marca', '').strip()
+    ultimos_4 = data.get('ultimos_4', '').strip()
+    es_principal = data.get('es_principal', False)
+
+    if not marca or not ultimos_4:
+        return jsonify({
+            'status': 'error',
+            'message': 'Marca y ultimos 4 digitos son obligatorios'
+        }), 400
+
+    if len(ultimos_4) != 4 or not ultimos_4.isdigit():
+        return jsonify({
+            'status': 'error',
+            'message': 'Los ultimos 4 digitos no son validos'
+        }), 400
+
+    if es_principal:
+        PaymentMethod.query.filter_by(
+            user_id=user_id,
+            es_principal=True
+        ).update({
+            'es_principal': False
+        })
+
+    nuevo_metodo = PaymentMethod(
+        user_id=user_id,
+        marca=marca,
+        ultimos_4=ultimos_4,
+        es_principal=es_principal
+    )
+
+    db.session.add(nuevo_metodo)
+    db.session.commit()
+
+    return jsonify({
+        'status': 'ok',
+        'message': 'Metodo de pago creado correctamente',
+        'payment_method': nuevo_metodo.to_dict()
+    }), 201
+
+
+# ============================================================
+# ELIMINAR METODO DE PAGO
+# ============================================================
+
+@app.route(
+    '/api/payment-methods/<int:payment_method_id>',
+    methods=['DELETE']
+)
+@jwt_required()
+def delete_payment_method(payment_method_id):
+    user_id = int(get_jwt_identity())
+
+    metodo = PaymentMethod.query.filter_by(
+        id=payment_method_id,
+        user_id=user_id
+    ).first()
+
+    if not metodo:
+        return jsonify({
+            'status': 'error',
+            'message': 'Metodo de pago no encontrado'
+        }), 404
+
+    db.session.delete(metodo)
+    db.session.commit()
+
+    return jsonify({
+        'status': 'ok',
+        'message': 'Metodo de pago eliminado correctamente'
+    }), 200
+
 
 
 # ============================================================

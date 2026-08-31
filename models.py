@@ -97,6 +97,51 @@ class Address(db.Model):
 
 
 # ============================================================
+# METODO DE PAGO
+# ============================================================
+
+class PaymentMethod(db.Model):
+    __tablename__ = 'payment_methods'
+
+    id = db.Column(
+        db.Integer,
+        primary_key=True
+    )
+
+    user_id = db.Column(
+        db.Integer,
+        db.ForeignKey('users.id'),
+        nullable=False
+    )
+
+    marca = db.Column(
+        db.String(50),
+        nullable=False
+    )
+
+    ultimos_4 = db.Column(
+        db.String(4),
+        nullable=False
+    )
+
+    es_principal = db.Column(
+        db.Boolean,
+        nullable=False,
+        default=False
+    )
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'marca': self.marca,
+            'ultimos_4': self.ultimos_4,
+            'es_principal': self.es_principal,
+            'descripcion': f'{self.marca} •••• {self.ultimos_4}'
+        }
+
+
+# ============================================================
 # RESTAURANTE
 # ============================================================
 

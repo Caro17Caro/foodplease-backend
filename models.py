@@ -40,6 +40,131 @@ class User(db.Model):
 
 
 # ============================================================
+# RESTAURANTE
+# ============================================================
+
+class Restaurant(db.Model):
+    __tablename__ = 'restaurants'
+
+    id = db.Column(
+        db.Integer,
+        primary_key=True
+    )
+
+    nombre = db.Column(
+        db.String(150),
+        nullable=False
+    )
+
+    categoria = db.Column(
+        db.String(100),
+        nullable=False
+    )
+
+    direccion = db.Column(
+        db.String(255),
+        nullable=True
+    )
+
+    tiempo_entrega = db.Column(
+        db.String(50),
+        nullable=True
+    )
+
+    costo_envio = db.Column(
+        db.Integer,
+        nullable=False,
+        default=1000
+    )
+
+    calificacion = db.Column(
+        db.Float,
+        nullable=False,
+        default=4.5
+    )
+
+    imagen = db.Column(
+        db.String(255),
+        nullable=True
+    )
+
+    productos = db.relationship(
+        'Product',
+        backref='restaurant',
+        lazy=True,
+        cascade='all, delete-orphan'
+    )
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'nombre': self.nombre,
+            'categoria': self.categoria,
+            'direccion': self.direccion,
+            'tiempo_entrega': self.tiempo_entrega,
+            'costo_envio': self.costo_envio,
+            'calificacion': self.calificacion,
+            'imagen': self.imagen
+        }
+
+
+# ============================================================
+# PRODUCTO
+# ============================================================
+
+class Product(db.Model):
+    __tablename__ = 'products'
+
+    id = db.Column(
+        db.Integer,
+        primary_key=True
+    )
+
+    restaurant_id = db.Column(
+        db.Integer,
+        db.ForeignKey('restaurants.id'),
+        nullable=False
+    )
+
+    nombre = db.Column(
+        db.String(150),
+        nullable=False
+    )
+
+    descripcion = db.Column(
+        db.String(255),
+        nullable=True
+    )
+
+    precio = db.Column(
+        db.Integer,
+        nullable=False
+    )
+
+    imagen = db.Column(
+        db.String(255),
+        nullable=True
+    )
+
+    disponible = db.Column(
+        db.Boolean,
+        nullable=False,
+        default=True
+    )
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'restaurant_id': self.restaurant_id,
+            'nombre': self.nombre,
+            'descripcion': self.descripcion,
+            'precio': self.precio,
+            'imagen': self.imagen,
+            'disponible': self.disponible
+        }
+
+
+# ============================================================
 # PEDIDO
 # ============================================================
 

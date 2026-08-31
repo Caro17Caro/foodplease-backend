@@ -16,7 +16,7 @@ from werkzeug.security import (
 )
 
 from database import db
-from models import User, Order
+from models import User, Order, Restaurant, Product
 
 
 app = Flask(__name__)
@@ -343,6 +343,112 @@ def get_order_detail(order_id):
         'order': pedido.to_dict()
     }), 200
 
+# ============================================================
+# LISTAR RESTAURANTES
+# ============================================================
+
+@app.route('/api/restaurants', methods=['GET'])
+def get_restaurants():
+    restaurantes = Restaurant.query.order_by(
+        Restaurant.nombre.asc()
+    ).all()
+
+    return jsonify({
+        'status': 'ok',
+        'restaurants': [
+            restaurante.to_dict()
+            for restaurante in restaurantes
+        ]
+    }), 200
+
+
+# ============================================================
+# DETALLE DE RESTAURANTE
+# ============================================================
+
+@app.route(
+    '/api/restaurants/<int:restaurant_id>',
+    methods=['GET']
+)
+def get_restaurant_detail(restaurant_id):
+    restaurante = db.session.get(
+        Restaurant,
+        restaurant_id
+    )
+
+    if not restaurante:
+        return jsonify({
+            'status': 'error',
+            'message': 'Restaurante no encontrado'
+        }), 404
+
+    return jsonify({
+        'status': 'ok',
+        'restaurant': restaurante.to_dict()
+    }), 200
+
+
+# ============================================================
+# PRODUCTOS DE UN RESTAURANTE
+# ============================================================
+
+@app.route(
+    '/api/restaurants/<int:restaurant_id>/products',
+    methods=['GET']
+)
+def get_restaurant_products(restaurant_id):
+    restaurante = db.session.get(
+        Restaurant,
+        restaurant_id
+    )
+
+    if not restaurante:
+        return jsonify({
+            'status': 'error',
+            'message': 'Restaurante no encontrado'
+        }), 404
+
+    productos = Product.query.filter_by(
+        restaurant_id=restaurant_id,
+        disponible=True
+    ).order_by(
+        Product.nombre.asc()
+    ).all()
+
+    return jsonify({
+        'status': 'ok',
+        'restaurant': restaurante.to_dict(),
+        'products': [
+            producto.to_dict()
+            for producto in productos
+        ]
+    }), 200
+
+
+# ============================================================
+# DETALLE DE PRODUCTO
+# ============================================================
+
+@app.route(
+    '/api/products/<int:product_id>',
+    methods=['GET']
+)
+def get_product_detail(product_id):
+    producto = db.session.get(
+        Product,
+        product_id
+    )
+
+    if not producto:
+        return jsonify({
+            'status': 'error',
+            'message': 'Producto no encontrado'
+        }), 404
+
+    return jsonify({
+        'status': 'ok',
+        'product': producto.to_dict()
+    }), 200
 
 # ============================================================
 # INICIO

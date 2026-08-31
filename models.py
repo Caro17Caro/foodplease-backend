@@ -40,6 +40,63 @@ class User(db.Model):
 
 
 # ============================================================
+# DIRECCION
+# ============================================================
+
+class Address(db.Model):
+    __tablename__ = 'addresses'
+
+    id = db.Column(
+        db.Integer,
+        primary_key=True
+    )
+
+    user_id = db.Column(
+        db.Integer,
+        db.ForeignKey('users.id'),
+        nullable=False
+    )
+
+    nombre = db.Column(
+        db.String(50),
+        nullable=False,
+        default='Casa'
+    )
+
+    direccion = db.Column(
+        db.String(255),
+        nullable=False
+    )
+
+    comuna = db.Column(
+        db.String(100),
+        nullable=False
+    )
+
+    referencia = db.Column(
+        db.String(255),
+        nullable=True
+    )
+
+    es_principal = db.Column(
+        db.Boolean,
+        nullable=False,
+        default=False
+    )
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'nombre': self.nombre,
+            'direccion': self.direccion,
+            'comuna': self.comuna,
+            'referencia': self.referencia,
+            'es_principal': self.es_principal
+        }
+
+
+# ============================================================
 # RESTAURANTE
 # ============================================================
 

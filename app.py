@@ -16,7 +16,7 @@ from werkzeug.security import (
 )
 
 from database import db
-from models import User, Order, Restaurant, Product
+from models import User, Order, Restaurant, Product, Address
 
 
 app = Flask(__name__)
@@ -205,6 +205,72 @@ def me():
 
 
 # ============================================================
+# EDITAR PERFIL
+# ============================================================
+
+@app.route('/api/me', methods=['PUT'])
+@jwt_required()
+def update_me():
+    user_id = int(get_jwt_identity())
+
+    usuario = db.session.get(
+        User,
+        user_id
+    )
+
+    if not usuario:
+        return jsonify({
+            'status': 'error',
+            'message': 'Usuario no encontrado'
+        }), 404
+
+    data = request.get_json()
+
+    if not data:
+        return jsonify({
+            'status': 'error',
+            'message': 'No se recibieron datos'
+        }), 400
+
+    nombre = data.get(
+        'nombre',
+        usuario.nombre
+    ).strip()
+
+    email = data.get(
+        'email',
+        usuario.email
+    ).strip().lower()
+
+    if not nombre or not email:
+        return jsonify({
+            'status': 'error',
+            'message': 'Nombre y email no pueden estar vacíos'
+        }), 400
+
+    email_existente = User.query.filter(
+        User.email == email,
+        User.id != user_id
+    ).first()
+
+    if email_existente:
+        return jsonify({
+            'status': 'error',
+            'message': 'Este correo ya está registrado'
+        }), 409
+
+    usuario.nombre = nombre
+    usuario.email = email
+
+    db.session.commit()
+
+    return jsonify({
+        'status': 'ok',
+        'message': 'Perfil actualizado correctamente',
+        'user': usuario.to_dict()
+    }), 200
+
+# ============================================================
 # CREAR PEDIDO
 # ============================================================
 
@@ -279,6 +345,224 @@ def create_order():
         'message': 'Pedido creado correctamente',
         'order': nuevo_pedido.to_dict()
     }), 201
+
+
+# ============================================================
+# LISTAR DIRECCIONES DEL USUARIO
+# ============================================================
+
+@app.route('/api/addresses', methods=['GET'])
+@jwt_required()
+def get_addresses():
+    user_id = int(get_jwt_identity())
+
+    direcciones = Address.query.filter_by(
+        user_id=user_id
+    ).order_by(
+        Address.es_principal.desc(),
+        Address.id.asc()
+    ).all()
+
+    return jsonify({
+        'status': 'ok',
+        'addresses': [
+            direccion.to_dict()
+            for direccion in direcciones
+        ]
+    }), 200
+
+
+# ============================================================
+# CREAR DIRECCION
+# ============================================================
+
+@app.route('/api/addresses', methods=['POST'])
+@jwt_required()
+def create_address():
+    user_id = int(get_jwt_identity())
+    data = request.get_json()
+
+    if not data:
+        return jsonify({
+            'status': 'error',
+            'message': 'No se recibieron datos'
+        }), 400
+
+    nombre = data.get(
+        'nombre',
+        'Casa'
+    ).strip()
+
+    direccion = data.get(
+        'direccion',
+        ''
+    ).strip()
+
+    comuna = data.get(
+        'comuna',
+        ''
+    ).strip()
+
+    referencia = data.get(
+        'referencia',
+        ''
+    ).strip()
+
+    es_principal = data.get(
+        'es_principal',
+        False
+    )
+
+    if not direccion or not comuna:
+        return jsonify({
+            'status': 'error',
+            'message': 'Direccion y comuna son obligatorias'
+        }), 400
+
+    # Si será principal, quitamos la marca principal
+    # de las otras direcciones del mismo usuario.
+    if es_principal:
+        Address.query.filter_by(
+            user_id=user_id,
+            es_principal=True
+        ).update({
+            'es_principal': False
+        })
+
+    nueva_direccion = Address(
+        user_id=user_id,
+        nombre=nombre,
+        direccion=direccion,
+        comuna=comuna,
+        referencia=referencia,
+        es_principal=es_principal
+    )
+
+    db.session.add(nueva_direccion)
+    db.session.commit()
+
+    return jsonify({
+        'status': 'ok',
+        'message': 'Direccion creada correctamente',
+        'address': nueva_direccion.to_dict()
+    }), 201
+
+
+# ============================================================
+# EDITAR DIRECCION
+# ============================================================
+
+@app.route(
+    '/api/addresses/<int:address_id>',
+    methods=['PUT']
+)
+@jwt_required()
+def update_address(address_id):
+    user_id = int(get_jwt_identity())
+
+    direccion_usuario = Address.query.filter_by(
+        id=address_id,
+        user_id=user_id
+    ).first()
+
+    if not direccion_usuario:
+        return jsonify({
+            'status': 'error',
+            'message': 'Direccion no encontrada'
+        }), 404
+
+    data = request.get_json()
+
+    if not data:
+        return jsonify({
+            'status': 'error',
+            'message': 'No se recibieron datos'
+        }), 400
+
+    nombre = data.get(
+        'nombre',
+        direccion_usuario.nombre
+    ).strip()
+
+    direccion = data.get(
+        'direccion',
+        direccion_usuario.direccion
+    ).strip()
+
+    comuna = data.get(
+        'comuna',
+        direccion_usuario.comuna
+    ).strip()
+
+    referencia = data.get(
+        'referencia',
+        direccion_usuario.referencia or ''
+    ).strip()
+
+    es_principal = data.get(
+        'es_principal',
+        direccion_usuario.es_principal
+    )
+
+    if not direccion or not comuna:
+        return jsonify({
+            'status': 'error',
+            'message': 'Direccion y comuna son obligatorias'
+        }), 400
+
+    if es_principal:
+        Address.query.filter(
+            Address.user_id == user_id,
+            Address.id != address_id
+        ).update({
+            'es_principal': False
+        })
+
+    direccion_usuario.nombre = nombre
+    direccion_usuario.direccion = direccion
+    direccion_usuario.comuna = comuna
+    direccion_usuario.referencia = referencia
+    direccion_usuario.es_principal = es_principal
+
+    db.session.commit()
+
+    return jsonify({
+        'status': 'ok',
+        'message': 'Direccion actualizada correctamente',
+        'address': direccion_usuario.to_dict()
+    }), 200
+
+
+# ============================================================
+# ELIMINAR DIRECCION
+# ============================================================
+
+@app.route(
+    '/api/addresses/<int:address_id>',
+    methods=['DELETE']
+)
+@jwt_required()
+def delete_address(address_id):
+    user_id = int(get_jwt_identity())
+
+    direccion_usuario = Address.query.filter_by(
+        id=address_id,
+        user_id=user_id
+    ).first()
+
+    if not direccion_usuario:
+        return jsonify({
+            'status': 'error',
+            'message': 'Direccion no encontrada'
+        }), 404
+
+    db.session.delete(direccion_usuario)
+    db.session.commit()
+
+    return jsonify({
+        'status': 'ok',
+        'message': 'Direccion eliminada correctamente'
+    }), 200
 
 
 # ============================================================
